@@ -1,0 +1,31 @@
+* Overview
+  - automatic recognition and highlighting of things at point
+  - an interface for writing commands that operate on things
+  - commands for copying, killing and pasting things as an example of use of this interface
+  Inspired by xah-fly-keys, expand-region and objed.
+  Works best when combined with modal text editing.
+  This package is not stable yet. It's sitll in development, public interface may change.
+
+* TODO Motivation
+  I started working on this package because I was lookig for a new approach that would help me
+  save a couple of keystrokes on each common task such as copying and pasting text,
+  evaluation of lisp expressions and shell-commands, changing letter case, etc.
+
+  For a year I used a wonderful package "expand-region" for that purpose. Despite it being
+  very smart and useful, it still requires 2 actions to select an object under the point.
+  First, the user must navigate to the desired location, and then call er/expand-region
+  to select an object. I thought that the second step was redundant and decided to
+  write a package that will work without it.
+  
+* Goals
+  - Deterministic and unambiguous mechanism for identification and highlighting of things at point.
+  - Modular design. This is a component that can be used to augment capabilities of other text
+    editing packages and modal editing modes, rather than a complete mode.
+  - Lean codebase. This package will remain as small as possible.
+  - Simple interface for defining commands that operate on highlighted things or active region.
+
+* Tasks 
+  - Fix annoying bug in atp-toggle-comment.
+  - Fix annoying bug in atp-try-comment.
+  - Compatibility with electric-pair.
+    Implement convenient insertion of pairs around highlighted thing.
