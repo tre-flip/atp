@@ -1,10 +1,12 @@
-;;; atp --- "auto thing at point" 
+;;; atp --- "auto thing at point"
 
 ;; Author: treflip
 ;; Version: 0.1
 ;; URL: https://github.com/tre-flip/atp
 ;; Package-Requires: ((emacs "25.1"))
 ;; License: GPLv3
+
+;;; Commentary:
 ;; This package provides automatic recognition and highlighting of things at point,
 ;; an interface for writing commands that operate on things and commands
 ;; for copying, killing, pasting things as an example of use of this interface.
@@ -15,10 +17,20 @@
 
 (require 'thingatpt)
 
+;; enable lexical binding
+(setq lexical-binding t)
+
 ;; MODE DEFINITION:
 
+(defgroup atp nil
+  "Auto thing at point"
+  :group  'atp
+  :tag    "atp"
+  :prefix "atp-")
+
 (defvar atp-include-newline t
-  "If t, include newline in overlay when whole line is highlighted.")
+  "If t, include newline in overlay when whole line is highlighted.
+Default value is t.")
 
 (defvar atp-excluded-modes nil
   "Overlay is disabled in modes from this list.")
@@ -26,13 +38,6 @@
 (defface atp-thing-active
   '((t :inherit highlight :extend t))
   "Used for highlighting active thing.")
-
-(defgroup atp nil
-  "Auto thing at point"
-  :group  'editing
-  :tag    "atp"
-  :prefix "atp-"
-  )
 
 (define-minor-mode atp-mode
   "Toggle the `atp-mode' minor mode.
@@ -61,7 +66,9 @@ This is used by `atp-global-mode'."
 ;; REGEX HELPERS:
 
 (defun atp-looking-back-on-line (regexp)
-  "Version of `looking-back' that only checks current line."
+  "Version of `looking-back' that only checks current line.
+REGEXP is a regular expression."
+  ;; borrowed from expand-region
   (looking-back regexp (line-beginning-position)))
 
 ;; THING VARIABLES:
@@ -71,20 +78,20 @@ This is used by `atp-global-mode'."
 
 ;; FUNCTIONS FOR ACCESSING OVERLAY:
 (defun atp-thing-end-position ()
-  "End of thing"
+  "End of thing."
   (when atp-thing-overlay
       (overlay-end atp-thing-overlay)))
 
-(defun atp-thing-beginning-postion () 
-  "Beginnig of thing"
+(defun atp-thing-beginning-postion ()
+  "Beginnig of thing."
   (when atp-thing-overlay
     (overlay-start atp-thing-overlay)))
 
 ;; DISPLAY OVERLAY:
 (defun atp-draw-overlay (&optional beg end)
-  "Draws an overlay and saves it to `atp-thing-overlay'.
-If either beg or end is nil, erase overlay.
-Returns t if overlay was drawn, nil if was erased."
+  "Draw an overlay and save it to `atp-thing-overlay'.
+If BEG or END is nil, delete overlay.
+Returns t if overlay was drawn, nil if was deleted."
   (when atp-thing-overlay
     (delete-overlay atp-thing-overlay)
     nil)
@@ -96,7 +103,7 @@ Returns t if overlay was drawn, nil if was erased."
 
 ;; FUNCTIONS FOR THING IDENTIFICATION AND OVERLAY PLACEMENT:
 (defun atp-try-whole-buffer ()
-  "If looking at the beginnig or end of buffer, highlight it"
+  "If looking at the beginnig or end of buffer, highlight it."
   (when (or (bobp) (eobp))
     (atp-draw-overlay (point-min)
 		      (point-max))))
@@ -124,7 +131,7 @@ Returns t if overlay was drawn, nil if was erased."
 (defun atp-try-line ()
   "If looking at the beginning or end of line, hightlight it if not lookig at pair."
   (when (and (or (looking-at "$")
-		 (looking-back "^[ \t]*"))
+		 (looking-back "^[ \t]*" nil))
 	     (not (or (looking-at "\\s(\\|\\s\"")
 		      (atp-looking-back-on-line "\\s)\\|\\s\""))))
     (atp-draw-overlay (line-beginning-position)
@@ -133,7 +140,7 @@ Returns t if overlay was drawn, nil if was erased."
 			(line-end-position)))))
 
 (defun atp-try-sexp ()
-  "If looking at sexp highlight it"
+  "If looking at sexp highlight it."
   (let ((bounds (bounds-of-thing-at-point 'sexp)))
     (when (and bounds
 	       (or (eql (point) (car bounds))
@@ -158,13 +165,13 @@ Returns t if overlay was drawn, nil if was erased."
 (defun atp-try-comment ()
   "If looking at comment, highlight it."
   (let ((bounds (bounds-of-thing-at-point 'comment)))
-    (when bounds    
+    (when bounds
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
 
 ;; RECOGNIZE AND DISPLAY OVERLAY
 (defun atp-update-thing ()
-  "Computes thing and move overlay"
+  "Computes thing and move overlay."
   (cond
      ;; disable thing recognition
    ((or (minibufferp) ;; in minibuffer
@@ -180,7 +187,7 @@ Returns t if overlay was drawn, nil if was erased."
    ((atp-try-sexp))
    ((atp-try-url))
    ((atp-try-word))
-   ((atp-try-comment))   
+   ((atp-try-comment))
    (t (atp-draw-overlay))))
 
 (defun atp-post-command ()
@@ -189,8 +196,9 @@ Returns t if overlay was drawn, nil if was erased."
 
 ;; FUNCTIONS FOR THING PROCESSING
 (defun atp-apply (command &rest args)
-  "Applies command to highlighted thing or region.
-Command is expected to have at least 2 first positional args: START and END."
+  "Apply COMMAND to highlighted thing or region.
+COMMAND is expected to have at least 2 first positional args: START and END.
+The rest of its arguments are passed into ARGS."
   ;; If overlay is active, apply to overlay. If not, command-execute.
   (interactive)
   (cond ((and (atp-thing-beginning-postion)
@@ -205,7 +213,7 @@ Command is expected to have at least 2 first positional args: START and END."
 	 (command-execute command))))
 
 (defun atp-copy ()
-  "Copy highlighted thing"
+  "Copy highlighted thing."
   (interactive)
   (atp-apply #'kill-ring-save))
 
@@ -267,4 +275,4 @@ Command is expected to have at least 2 first positional args: START and END."
 		 (yank))))
 
 (provide 'atp)
-;; atp.el ends here
+;;; atp.el ends here

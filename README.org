@@ -1,4 +1,5 @@
 * Overview
+  This package provides:
   - automatic recognition and highlighting of things at point
   - an interface for writing commands that operate on things
   - commands for copying, killing and pasting things as an example of use of this interface
@@ -6,7 +7,7 @@
   Works best when combined with modal text editing.
   This package is not stable yet. It's sitll in development, public interface may change.
 
-* TODO Motivation
+* Motivation
   I started working on this package because I was lookig for a new approach that would help me
   save a couple of keystrokes on each common task such as copying and pasting text,
   evaluation of lisp expressions and shell-commands, changing letter case, etc.
