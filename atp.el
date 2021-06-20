@@ -101,7 +101,7 @@ Returns t if overlay was drawn, nil if was deleted."
     (overlay-put atp-thing-overlay 'face 'atp-thing-active)
     t))
 
-;; FUNCTIONS FOR THING IDENTIFICATION AND OVERLAY PLACEMENT:
+;; THING IDENTIFICATION AND OVERLAY PLACEMENT:
 (defun atp-try-whole-buffer ()
   "If looking at the beginnig or end of buffer, highlight it."
   (when (or (bobp) (eobp))
@@ -148,6 +148,7 @@ Returns t if overlay was drawn, nil if was deleted."
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
 
+;; this is slow
 (defun atp-try-url ()
   "If looking at url, highlight it."
   (let ((bounds (bounds-of-thing-at-point 'url)))
@@ -169,26 +170,55 @@ Returns t if overlay was drawn, nil if was deleted."
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
 
+(defvar atp-functions nil
+  "An ordered list of functions.
+Each function from this list tries to identify the thing at point
+and highlight it.  Functions are called successively by
+`atp-update-thing' unitl one of them returns a non nil value.
+This variable is reset to `atp-default-functions' after each call
+to `atp-update-thing'")
+
+(defvar atp-default-functions
+  (list #'atp-try-whole-buffer
+	#'atp-try-defun
+	#'atp-try-paragraph
+	#'atp-try-line
+	#'atp-try-sexp
+	#'atp-try-url
+	#'atp-try-word
+	#'atp-try-comment
+	;; if none of these functions work, remove overlay
+	#'atp-draw-overlay)
+  "An ordered list of functions.
+Each function from this list tries to identify the thing at point
+and highlight it.  Functions are called successively by
+`atp-update-thing' unitl one of them returns a non nil value.
+This is the default value for `atp-functions', that is restored
+after each call to `atp-update-thing'.")
+
+(defun atp-add-functions (&rest functions)
+  "Temporaryly append a list of FUNCTIONS at the beginning of `atp-functions'."
+  (setq atp-functions (nconc functions atp-functions)))
+
+(defun atp-restore-functions ()
+  "Reset `atp-functions' to its default value."
+  (setq atp-functions atp-default-functions))
+
 ;; RECOGNIZE AND DISPLAY OVERLAY
+
 (defun atp-update-thing ()
-  "Computes thing and move overlay."
-  (cond
-     ;; disable thing recognition
-   ((or (minibufferp) ;; in minibuffer
-	(member major-mode atp-excluded-modes) ;; in excluded modes
-	(region-active-p)) ;; when region is active
-      (atp-draw-overlay))
-     ;; else, try to recognize thing in the following order
-   ;; each of these functions updates overlay
-   ((atp-try-whole-buffer))
-   ((atp-try-defun))
-   ((atp-try-paragraph))
-   ((atp-try-line))
-   ((atp-try-sexp))
-   ((atp-try-url))
-   ((atp-try-word))
-   ((atp-try-comment))
-   (t (atp-draw-overlay))))
+  "Identify thing at point and draw an overlay."
+  ;; don't draw when
+  (if (or (minibufferp) ;; in minibuffer
+	(member major-mode atp-excluded-modes) ;; in excluded mode
+	(region-active-p)) ;; region is active
+      (atp-draw-overlay)
+    ;; successively execute functions in atp-functions until one of them returns non-nil
+    (let ((funcs atp-functions)
+	  success)
+      (while (and funcs (not success))
+	(setq success (funcall (pop funcs)))))
+    (atp-restore-functions)))
 
 (defun atp-post-command ()
   "Executed after every command when atp mode in active."
