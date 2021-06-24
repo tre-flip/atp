@@ -198,7 +198,8 @@ after each call to `atp-update-thing'.")
 
 (defun atp-add-functions (&rest functions)
   "Temporaryly append a list of FUNCTIONS at the beginning of `atp-functions'."
-  (setq atp-functions (nconc functions atp-functions)))
+  ;; NOT THE BEST WAY TO CONCATENATE LISTS!!!
+  (setq atp-functions (nconc functions (copy-sequence atp-default-functions))))
 
 (defun atp-restore-functions ()
   "Reset `atp-functions' to its default value."
