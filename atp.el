@@ -166,7 +166,9 @@ Returns t if overlay was drawn, nil if was deleted."
 (defun atp-try-comment ()
   "If looking at comment, highlight it."
   (let ((bounds (bounds-of-thing-at-point 'comment)))
-    (when bounds
+    (when (and bounds
+	       (looking-at "\\s!\\|\\s<\\|\\s>"))
+      (message "COMMENT")
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
 

@@ -26,7 +26,7 @@
   - Simple interface for defining commands that operate on highlighted things or active region.
 
 * Tasks 
-  - Fix annoying bug in atp-toggle-comment.
-  - Fix annoying bug in atp-try-comment.
+  - Fix atp-toggle-comment.
   - Compatibility with electric-pair.
     Implement convenient insertion of pairs around highlighted thing.
+  - Deal with sequences of blank characters.   
