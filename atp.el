@@ -35,6 +35,12 @@ Default value is t.")
 (defvar atp-excluded-modes nil
   "Overlay is disabled in modes from this list.")
 
+(defvar atp-known-commands '(kill-region kill-ring-save)
+  "A list of commands known to atp. Each of these commands must operate on region and allow deactivation of region.")
+
+(defvar atp-known-repeatable-commands '(er/expand-region)
+  "A list of commands known to atp. Each of these commands must operate on region.")
+
 (defface atp-thing-active
   '((t :inherit highlight :extend t))
   "Used for highlighting active thing.")
@@ -47,7 +53,9 @@ the mode if ARG is omitted or NIL, and toggle it if ARG is
 `toggle'."
   nil " ATP" nil
   (if atp-mode
-      (add-hook 'post-command-hook 'atp-post-command)
+      (progn
+	(add-hook 'post-command-hook 'atp-post-command)
+	(add-hook 'pre-command-hook 'atp-pre-command))
     (remove-hook 'post-command-hook 'atp-post-command)
     (atp-draw-overlay)))
 
@@ -82,7 +90,7 @@ REGEXP is a regular expression."
   (when atp-thing-overlay
       (overlay-end atp-thing-overlay)))
 
-(defun atp-thing-beginning-postion ()
+(defun atp-thing-beginning-position ()
   "Beginnig of thing."
   (when atp-thing-overlay
     (overlay-start atp-thing-overlay)))
@@ -144,7 +152,17 @@ Returns t if overlay was drawn, nil if was deleted."
   (let ((bounds (bounds-of-thing-at-point 'sexp)))
     (when (and bounds
 	       (or (eql (point) (car bounds))
-		   (eql (point) (cdr bounds))))
+		   (eql (point) (cdr bounds))
+		   (eql (cdr bounds) ; handle empty sexps like ()
+			(+ 2 (car bounds)))))
+      (atp-draw-overlay (car bounds)
+			(cdr bounds)))))
+
+(defun atp-try-whitespace ()
+  "If looking at whitespace highlight it."
+  (let ((bounds (bounds-of-thing-at-point 'whitespace)))
+    (when bounds
+      (message "WHITESPACE") ; remove debug
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
 
@@ -188,6 +206,7 @@ to `atp-update-thing'")
 	#'atp-try-sexp
 	#'atp-try-url
 	#'atp-try-word
+	#'atp-try-whitespace
 	#'atp-try-comment
 	;; if none of these functions work, remove overlay
 	#'atp-draw-overlay)
@@ -223,10 +242,6 @@ after each call to `atp-update-thing'.")
 	(setq success (funcall (pop funcs)))))
     (atp-restore-functions)))
 
-(defun atp-post-command ()
-  "Executed after every command when atp mode in active."
-  (atp-update-thing))
-
 ;; FUNCTIONS FOR THING PROCESSING
 (defun atp-apply (command &rest args)
   "Apply COMMAND to highlighted thing or region.
@@ -234,16 +249,37 @@ COMMAND is expected to have at least 2 first positional args: START and END.
 The rest of its arguments are passed into ARGS."
   ;; If overlay is active, apply to overlay. If not, command-execute.
   (interactive)
-  (cond ((and (atp-thing-beginning-postion)
+  (cond ((and (atp-thing-beginning-position)
 	      (atp-thing-end-position))
 	 (apply command
-		  (atp-thing-beginning-postion)
+		  (atp-thing-beginning-position)
 		  (atp-thing-end-position)
 		  args))
 	((region-active-p)
 	 (apply command (region-beginning) (region-end) args))
-	(t
+	(t ; this is probably incorrect if there is no active region and no atp overlay
 	 (command-execute command))))
+
+(defun atp-mark ()
+  "Mark hightlighted thing as region."
+  (interactive)
+  (let ((!start (atp-thing-beginning-position))
+	(!end (atp-thing-end-position)))
+    (when (and !start !end)
+      (set-mark !start)
+      (goto-char !end))))
+
+(defun atp-pre-command ()
+  "Executed before every command when atp mode in active."
+  (when (or (member this-command atp-known-commands)
+	    (member this-command atp-known-repeatable-commands))
+    (atp-mark)))
+
+(defun atp-post-command ()
+  "Executed after every command when atp mode in active."
+  (when (member this-command atp-known-commands)
+    (deactivate-mark))
+  (atp-update-thing))
 
 (defun atp-copy ()
   "Copy highlighted thing."
@@ -253,9 +289,13 @@ The rest of its arguments are passed into ARGS."
 (defun atp-kill ()
   "Kill highlighted thing."
   (interactive)
-  (atp-apply #'kill-region))
+  (atp-apply #'kill-region)
+  ;; (when (and (not (eq (point) (line-beginning-position)))
+  ;; 	     (looking-at "[ \t]+"))
+  ;;   (just-one-space))
+  )
 
-;; FIX: comment doesn't work when point is at the end of line
+;; FIXME: comment doesn't work when point is at the end of line
 (defun atp-toggle-comment ()
   "Uncomment highlighted thing if looking at comment delimimter, else comment thing."
   (interactive)
@@ -267,15 +307,6 @@ The rest of its arguments are passed into ARGS."
 	(atp-apply #'uncomment-region)
       (atp-apply #'comment-or-uncomment-region))))
 
-(defun atp-mark ()
-  "Mark hightlighted thing as region."
-  (interactive)
-  (let ((!start (atp-thing-beginning-postion))
-	(!end (atp-thing-end-position)))
-    (when (and !start !end)
-      (set-mark !start)
-      (goto-char !end))))
-
 (defun atp-toggle-case ()
   "Toggle letter case inside region or highlighted thing."
   ;; based on xah-toggle-letter-case
@@ -284,7 +315,7 @@ The rest of its arguments are passed into ARGS."
         $p1 $p2)
     (if (use-region-p)
         (setq $p1 (region-beginning) $p2 (region-end))
-      (setq $p1 (atp-thing-beginning-postion)
+      (setq $p1 (atp-thing-beginning-position)
 	    $p2 (atp-thing-end-position)))
     (when (not (eq last-command this-command))
       (put this-command 'state 0))
