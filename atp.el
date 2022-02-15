@@ -53,8 +53,8 @@ the mode if ARG is omitted or NIL, and toggle it if ARG is
   nil " ATP" nil
   (if atp-mode
       (progn
-	(add-hook 'post-command-hook 'atp-post-command)
-	(add-hook 'pre-command-hook 'atp-pre-command))
+		(add-hook 'post-command-hook 'atp-post-command)
+		(add-hook 'pre-command-hook 'atp-pre-command))
     (remove-hook 'post-command-hook 'atp-post-command)
     (atp-draw-overlay)))
 
@@ -79,6 +79,12 @@ REGEXP is a regular expression."
   (looking-back regexp (line-beginning-position)))
 
 ;; THING VARIABLES:
+
+;; todo: use defcustom instead
+(defvar atp-inhibit-on-self-insert nil
+  "If t, when disable overlay as soon as `self-insert-command' is called (usually, when the user starts typing text).")
+
+(defvar atp-inhibit-overlay nil)
 
 (defvar atp-thing-overlay nil
   "An overlay over current thing.")
@@ -224,9 +230,11 @@ This variable is buffer local.")
 (defun atp-update-thing ()
   "Identify thing at point and draw an overlay."
   ;; don't draw when
-  (if (or (minibufferp) ;; in minibuffer
-	(member major-mode atp-excluded-modes) ;; in excluded mode
-	(region-active-p)) ;; region is active
+  (if (or atp-inhibit-overlay
+		  (minibufferp) ;; in minibuffer
+		  (member major-mode atp-excluded-modes) ;; in excluded mode
+		  (region-active-p)
+		  ) ;; region is active
       (atp-draw-overlay)
     ;; successively execute functions in atp-functions until one of them returns non-nil
     (let ((funcs atp-functions))
@@ -261,9 +269,13 @@ The rest of its arguments are passed into ARGS."
 
 (defun atp-pre-command ()
   "Executed before every command when atp mode in active."
-  (when (or (member this-command atp-known-commands)
+  (if (and atp-inhibit-on-self-insert
+		   (equal this-command 'self-insert-command))
+	  (setq atp-inhibit-overlay t)
+	(setq atp-inhibit-overlay nil)
+	(when (or (member this-command atp-known-commands)
 	    (member this-command atp-known-repeatable-commands))
-    (atp-mark)))
+    (atp-mark))))
 
 (defun atp-post-command ()
   "Executed after every command when atp mode in active."
@@ -342,7 +354,7 @@ The rest of its arguments are passed into ARGS."
 		  (atp-draw-overlay begin end))))))
 
 (defun atp-setup-org-mode-functions ()
-  (interactive)
+  "Configure `atp-functions' for `org-mode'."
   (setq-local atp-functions
 			  (list #'atp-try-whole-buffer
 					#'atp-try-org-headline-or-item

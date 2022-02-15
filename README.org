@@ -1,16 +1,17 @@
 * Overview
   This package provides:
-  - automatic recognition and highlighting of things at point
-  - an interface for writing commands that operate on things
-  - commands for copying, killing and pasting things as an example of use of this interface
+  - Automatic recognition and highlighting of things at point.
+  - An interface for writing commands that operate on things.
+  - Commands for copying, killing and pasting things as an example of use of this interface.
+  - An option to disable the highlighting as soon as the user starts typing. It will be enabled again when the user calls any command apart from *self-insert-command*.
   Inspired by xah-fly-keys, expand-region and objed.
   Works best when combined with modal text editing.
   This package is not stable yet. It's sitll in development, public interface may change.
 
 * Motivation
-  I started working on this package because I was lookig for a new approach that would save me a
-  couple of keystrokes on each common task such as copying and pasting text, evaluation of lisp
-  expressions and shell-commands, changing letter case, etc.
+  I started working on this package because I was lookig for a new approach that would
+  save me a couple of keystrokes on each common task such as copying and pasting text,
+  evaluation of lisp expressions and shell-commands, changing letter case, etc.
 
   For a year I used a wonderful package "expand-region" for that purpose. Despite it being
   very smart and useful, it still requires 2 actions to select an object under the point.
@@ -26,12 +27,18 @@
   - A mechanism that allows existing commands to operate on highlighted things.
   - Simple interface for writing new commands that operate on highlighted things.
 
-* Tasks / ideas
-  - Implement "smart" automatic activation. \\
-	Add an option to disable atp-mode automatically when the user starts typing. \\
-	Add an option to enable atp-mode automatically when any command apart from
-    self-insert-command is executed.
+* Integration with expand region
+  This is trivial. Add *er/expand-region* to *atp-known-repeatable-commands*. Now, when
+  you call *er/expand-region* by issuing a keystroke, the highlighted thing will be marked
+  as a region and then *er/expand-region* will execute, expanding this region.
+  
+  #+begin_src elisp
+	(add-to-list 'atp-known-repeatable-commands 'er/expand-region)
+  #+end_src
 
+* Tasks
+  - Use *defcustom* instead of *defvar* where possible.
+  - Record a video demo.
   - Fix atp-toggle-comment.
   - Compatibility with electric-pair. (hard)
     Implement convenient insertion of pairs around highlighted thing.
