@@ -1,7 +1,7 @@
 ;;; atp --- "auto thing at point"
 
 ;; Author: treflip
-;; Version: 0.1
+;; Version: 0.2
 ;; URL: https://github.com/tre-flip/atp
 ;; Package-Requires: ((emacs "25.1"))
 ;; License: GPLv3
@@ -10,7 +10,6 @@
 ;; This package provides automatic recognition and highlighting of things at point,
 ;; an interface for writing commands that operate on things and commands
 ;; for copying, killing, pasting things as an example of use of this interface.
-;; Inspired by xah-fly-keys, expand-region and objed.
 ;; Works best when combined with modal editing.
 
 ;;; Code:
@@ -35,11 +34,11 @@ Default value is t.")
 (defvar atp-excluded-modes nil
   "Overlay is disabled in modes from this list.")
 
-(defvar atp-known-commands '(kill-region kill-ring-save)
-  "A list of commands known to atp. Each of these commands must operate on region and allow deactivation of region.")
+(defvar atp-known-commands (list 'kill-region 'kill-ring-save)
+  "A list of commands known to atp.  Each of these commands must operate on region and allow deactivation of region.")
 
-(defvar atp-known-repeatable-commands '(er/expand-region)
-  "A list of commands known to atp. Each of these commands must operate on region.")
+(defvar atp-known-repeatable-commands (list 'er/expand-region)
+  "A list of commands known to atp.  Each of these commands must operate on region.")
 
 (defface atp-thing-active
   '((t :inherit highlight :extend t))
@@ -138,8 +137,10 @@ Returns t if overlay was drawn, nil if was deleted."
 
 (defun atp-try-line ()
   "If looking at the beginning or end of line, hightlight it if not lookig at pair."
-  (when (and (or (looking-at "$")
-		 (looking-back "^[ \t]*" nil))
+  (when (and (or (eql (point) (line-beginning-position))
+		 (eql (point) (line-end-position)))
+	     ;; (or (looking-at "$")
+	     ;; 	 (looking-back "^[ \t]*" nil))
 	     (not (or (looking-at "\\s(\\|\\s\"")
 		      (atp-looking-back-on-line "\\s)\\|\\s\""))))
     (atp-draw-overlay (line-beginning-position)
@@ -153,7 +154,7 @@ Returns t if overlay was drawn, nil if was deleted."
     (when (and bounds
 	       (or (eql (point) (car bounds))
 		   (eql (point) (cdr bounds))
-		   (eql (cdr bounds) ; handle empty sexps like ()
+		   (eql (cdr bounds) ; handles empty sexps like ()
 			(+ 2 (car bounds)))))
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
@@ -162,7 +163,6 @@ Returns t if overlay was drawn, nil if was deleted."
   "If looking at whitespace highlight it."
   (let ((bounds (bounds-of-thing-at-point 'whitespace)))
     (when bounds
-      (message "WHITESPACE") ; remove debug
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
 
@@ -181,24 +181,23 @@ Returns t if overlay was drawn, nil if was deleted."
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
 
+(defun atp-try-symbol ()
+  "If looking at symbol highlight it."
+  (let ((bounds (bounds-of-thing-at-point 'symbol)))
+    (when (and bounds
+	       (looking-at "\\s_"))
+      (atp-draw-overlay (car bounds)
+			(cdr bounds)))))
+
 (defun atp-try-comment ()
   "If looking at comment, highlight it."
   (let ((bounds (bounds-of-thing-at-point 'comment)))
     (when (and bounds
 	       (looking-at "\\s!\\|\\s<\\|\\s>"))
-      (message "COMMENT")
       (atp-draw-overlay (car bounds)
 			(cdr bounds)))))
 
-(defvar atp-functions nil
-  "An ordered list of functions.
-Each function from this list tries to identify the thing at point
-and highlight it.  Functions are called successively by
-`atp-update-thing' unitl one of them returns a non nil value.
-This variable is reset to `atp-default-functions' after each call
-to `atp-update-thing'")
-
-(defvar atp-default-functions
+(defvar atp-functions
   (list #'atp-try-whole-buffer
 	#'atp-try-defun
 	#'atp-try-paragraph
@@ -206,6 +205,7 @@ to `atp-update-thing'")
 	#'atp-try-sexp
 	#'atp-try-url
 	#'atp-try-word
+	#'atp-try-symbol
 	#'atp-try-whitespace
 	#'atp-try-comment
 	;; if none of these functions work, remove overlay
@@ -214,17 +214,10 @@ to `atp-update-thing'")
 Each function from this list tries to identify the thing at point
 and highlight it.  Functions are called successively by
 `atp-update-thing' unitl one of them returns a non nil value.
-This is the default value for `atp-functions', that is restored
-after each call to `atp-update-thing'.")
 
-(defun atp-add-functions (&rest functions)
-  "Temporaryly append a list of FUNCTIONS at the beginning of `atp-functions'."
-  ;; NOT THE BEST WAY TO CONCATENATE LISTS!!!
-  (setq atp-functions (nconc functions (copy-sequence atp-default-functions))))
+This variable is buffer local.")
+(make-variable-buffer-local 'atp-functions)
 
-(defun atp-restore-functions ()
-  "Reset `atp-functions' to its default value."
-  (setq atp-functions atp-default-functions))
 
 ;; RECOGNIZE AND DISPLAY OVERLAY
 
@@ -236,11 +229,8 @@ after each call to `atp-update-thing'.")
 	(region-active-p)) ;; region is active
       (atp-draw-overlay)
     ;; successively execute functions in atp-functions until one of them returns non-nil
-    (let ((funcs atp-functions)
-	  success)
-      (while (and funcs (not success))
-	(setq success (funcall (pop funcs)))))
-    (atp-restore-functions)))
+    (let ((funcs atp-functions))
+      (while (and funcs (not (funcall (pop funcs)))))))) ; there is probably more efficient way to do this
 
 ;; FUNCTIONS FOR THING PROCESSING
 (defun atp-apply (command &rest args)
@@ -289,13 +279,9 @@ The rest of its arguments are passed into ARGS."
 (defun atp-kill ()
   "Kill highlighted thing."
   (interactive)
-  (atp-apply #'kill-region)
-  ;; (when (and (not (eq (point) (line-beginning-position)))
-  ;; 	     (looking-at "[ \t]+"))
-  ;;   (just-one-space))
-  )
+  (atp-apply #'kill-region))
 
-;; FIXME: comment doesn't work when point is at the end of line
+;; FIXME: doesn't work when point is at the end of line
 (defun atp-toggle-comment ()
   "Uncomment highlighted thing if looking at comment delimimter, else comment thing."
   (interactive)
@@ -337,6 +323,42 @@ The rest of its arguments are passed into ARGS."
 		 (interactive)
 		 (delete-region beg end)
 		 (yank))))
+
+;;; SPECIAL FUNCTIONS AND HOOKS FOR VARIOUS MODES
+;; TODO: move this section to a separate file
+
+;;; org-mode
+
+(defun atp-try-org-headline-or-item ()
+  "Select an org headline if `point' is at its beginning."
+  (interactive)
+  ;; TODO: consider rewriting it using pcase
+  (let* ((el (org-element-at-point))
+		 (eltype (car el)) )
+	(when (or (eql eltype 'headline) (eql eltype 'item))
+	  (let ((begin (org-element-property :begin el))
+			(end (org-element-property :end el)))
+		(when (= (point) begin)
+		  (atp-draw-overlay begin end))))))
+
+(defun atp-setup-org-mode-functions ()
+  (interactive)
+  (setq-local atp-functions
+			  (list #'atp-try-whole-buffer
+					#'atp-try-org-headline-or-item
+					#'atp-try-defun
+					#'atp-try-paragraph
+					#'atp-try-line
+					#'atp-try-sexp
+					#'atp-try-url
+					#'atp-try-word
+					#'atp-try-symbol
+					#'atp-try-whitespace
+					#'atp-try-comment
+					;; if none of these functions work, remove overlay
+					#'atp-draw-overlay)))
+
+(add-hook 'org-mode-hook 'atp-setup-org-mode-functions)
 
 (provide 'atp)
 ;;; atp.el ends here
