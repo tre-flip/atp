@@ -1,6 +1,7 @@
 * Overview
   This package provides:
   - Automatic recognition and highlighting of things at point.
+  - Simple integration with existing commands that operate on regions.
   - An interface for writing commands that operate on things.
   - Commands for copying, killing and pasting things as an example of use of this
     interface.
@@ -21,18 +22,7 @@
   to select an object. I thought that the second step was redundant and decided to
   write a package that works without it.
 
-* Goals
-  - Deterministic and unambiguous mechanism for identification and highlighting of things
-    at point.
-  - Modular design. This is a component that can be used to augment capabilities of other
-    text editing packages and modal editing modes, rather than a complete mode. However,
-    it can be used separately.
-  - Lean codebase. This package will remain as small as possible.
-  - A mechanism that allows existing commands to operate on highlighted things.
-  - Simple interface for writing new commands that operate on highlighted things.
-
 * User guide
-  
 ** Basics
    To enable automatic recognition and highlighting turn on *atp-mode*. Variable
    *atp-known-commands* is a list of commands that are known to atp and can operate of
@@ -57,14 +47,14 @@
    Variable *atp-inhibit-on-self-insert* may be set to *t* to disable highlighting of and
    operation on things as soon as the user starts typing text. Highlighting will be
    enabled automatically when the user issues any other command (for example moves the
-   cursor).   
+   cursor).
 
 * Integration with expand region
   When the user calls *er/expand-region* by issuing a keystroke, the highlighted thing
   will be marked as a region and then *er/expand-region* will execute, expanding this
   region. To disable this behavior, remove *er/expand-region* from
   *atp-known-repeatable-commands*:
-  
+
   #+begin_src elisp
 	(setq atp-known-repeatable-commands
 		  (delete 'er/expand-region atp-known-repeatable-commands))
@@ -72,7 +62,7 @@
 
 * Tasks
   - Use *defcustom* instead of *defvar* where possible.
-  - Record a video demo.
+  - Record a demo.
   - Fix atp-toggle-comment.
   - Compatibility with electric-pair. (hard)
     Implement convenient insertion of pairs around highlighted thing.
